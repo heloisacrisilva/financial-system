@@ -14,12 +14,12 @@ func InitializeRoutes(router *gin.Engine) {
 
 	accounts := api.Group("/accounts")
 	{
-		accounts.POST("", account.CreateAccount)
+		accounts.POST("/create", account.CreateAccountHandler)
 		accounts.GET("/:id", account.GetAccountByID)
 	}
 	operations := api.Group("/operations")
 	{
-		operations.POST("/:type", operation.CreateOperation)
+		operations.POST("/create/:type", operation.CreateOperation)
 		operations.GET("/:id", operation.GetOperationByID)
 	}
 }
