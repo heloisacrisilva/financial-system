@@ -2,6 +2,7 @@ package main
 
 import (
 	"financial/system/api/config"
+	"financial/system/api/router"
 	"log"
 
 	"github.com/joho/godotenv"
@@ -24,4 +25,5 @@ func main() {
 	logger = config.GetLogger()
 
 	logger.Info("Starting server...")
+	router.Initialize()
 }
