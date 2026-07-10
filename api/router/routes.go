@@ -2,6 +2,7 @@ package router
 
 import (
 	account "financial/system/api/handler/account"
+	client "financial/system/api/handler/client"
 	operation "financial/system/api/handler/operation"
 
 	"github.com/gin-gonic/gin"
@@ -21,5 +22,9 @@ func InitializeRoutes(router *gin.Engine) {
 	{
 		operations.POST("/create/:type", operation.CreateOperation)
 		operations.GET("/:id", operation.GetOperationByID)
+	}
+	clients := api.Group("/clients")
+	{
+		clients.GET("/:id", client.GetClientByID)
 	}
 }

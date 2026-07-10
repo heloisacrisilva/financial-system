@@ -7,7 +7,7 @@ import (
 type Account struct {
 	ID               uint64    `gorm:"primaryKey;autoIncrement"`
 	ClientID         uint64    `gorm:"not null;index"`
-	Client           Client    `gorm:"foreignKey:ClientID;references:ID"`
+	Client           Client    `gorm:"foreignKey:ClientID;references:ID" json:"-"`
 	AvailableBalance int64     `gorm:"not null"`
 	ReservedBalance  int64     `gorm:"not null"`
 	CreditLimit      int64     `gorm:"not null"`
