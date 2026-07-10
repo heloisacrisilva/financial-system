@@ -4,7 +4,7 @@ import (
 	"errors"
 	"financial/system/api/config"
 	"financial/system/api/handler"
-	"financial/system/api/repository"
+	repository "financial/system/api/repository/client"
 	"net/http"
 
 	"github.com/gin-gonic/gin"

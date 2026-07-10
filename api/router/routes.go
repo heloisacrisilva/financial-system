@@ -20,7 +20,7 @@ func InitializeRoutes(router *gin.Engine) {
 	}
 	operations := api.Group("/operations")
 	{
-		operations.POST("/create/:type", operation.CreateOperation)
+		operations.POST("/:type", operation.CreateOperation)
 		operations.GET("/:id", operation.GetOperationByID)
 	}
 	clients := api.Group("/clients")
