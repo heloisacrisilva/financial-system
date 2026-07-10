@@ -53,11 +53,13 @@ func CreateAccountRepository(name, email, cpf string) ([]map[string]interface{},
 		}
 
 		logger.Infof("Creating account with ClienteID: %d", client.ID)
+		//I set values ​​for AvailableBalance, ReservedBalance, and CreditLimit to simulate the creation of a real account, since we won't have a deposit route.
+
 		newAccount = entities.Account{
 			ClientID:         client.ID,
-			AvailableBalance: 0,
-			ReservedBalance:  0,
-			CreditLimit:      0,
+			AvailableBalance: 1000,
+			ReservedBalance:  500,
+			CreditLimit:      500,
 			Currency:         "BRL",
 			Status:           "active",
 		}
