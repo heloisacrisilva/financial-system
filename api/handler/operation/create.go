@@ -38,7 +38,7 @@ type OperationResponse struct {
 func CreateOperation(ctx *gin.Context) {
 	logger := config.GetLogger()
 	opType := ctx.Param("type")
-	availableTypes := []string{"debit", "credit", "reserve"}
+	availableTypes := []string{"debit", "credit", "reserve", "capture"}
 
 	if !slices.Contains(availableTypes, opType) {
 		handler.SendError(ctx, http.StatusBadRequest, "Invalid operation type.")
@@ -74,6 +74,9 @@ func CreateOperation(ctx *gin.Context) {
 			account, history, err = repository.DebitOperation(req.AccountID, req.Currency, req.Value, req.ReferenceID)
 		case "reserve":
 			account, history, err = repository.ReserveOperation(req.AccountID, req.Currency, req.Value, req.ReferenceID)
+
+		case "capture":
+			account, history, err = repository.CaptureOperation(req.AccountID, req.Currency, req.Value, req.ReferenceID)
 		}
 
 		if err == nil {
@@ -101,6 +104,8 @@ func CreateOperation(ctx *gin.Context) {
 				repository.RecordFailedDedit(req.AccountID, req.ReferenceID, req.Value, req.Currency, err)
 			} else if opType == "reserve" {
 				repository.RecordFailedReserve(req.AccountID, req.ReferenceID, req.Value, req.Currency, err)
+			} else if opType == "capture" {
+				repository.RecordFailedReserve(req.AccountID, req.ReferenceID, req.Value, req.Currency, err)
 			}
 			handler.SendError(ctx, http.StatusUnprocessableEntity, err.Error())
 			return
@@ -111,6 +116,8 @@ func CreateOperation(ctx *gin.Context) {
 			} else if opType == "debit" {
 				repository.RecordFailedDedit(req.AccountID, req.ReferenceID, req.Value, req.Currency, err)
 			} else if opType == "reserve" {
+				repository.RecordFailedReserve(req.AccountID, req.ReferenceID, req.Value, req.Currency, err)
+			} else if opType == "capture" {
 				repository.RecordFailedReserve(req.AccountID, req.ReferenceID, req.Value, req.Currency, err)
 			}
 			handler.SendError(ctx, http.StatusUnprocessableEntity, err.Error())
