@@ -27,8 +27,11 @@ type OperationResponse struct {
 	Balance          int64     `json:"balance"`
 	ReservedBalance  int64     `json:"reserved_balance"`
 	AvailableBalance int64     `json:"available_balance"`
+	CreditUsed       int64     `json:"credit_used"`
+	CreditAvailable  int64     `json:"credit_available"`
 	Timestamp        time.Time `json:"timestamp"`
 	ErrorMessage     *string   `json:"error_message"`
+	Type             string    `json:"type"`
 }
 
 func CreateOperation(ctx *gin.Context) {
@@ -36,7 +39,7 @@ func CreateOperation(ctx *gin.Context) {
 	opType := ctx.Param("type")
 
 	//FIXME:
-	if opType != "credit" {
+	if opType != "credit" && opType != "debit" {
 		handler.SendError(ctx, http.StatusBadRequest, "Invalid operation type.")
 		return
 	}
@@ -61,9 +64,11 @@ func CreateOperation(ctx *gin.Context) {
 	var history *entities.TransactionHistory
 	var err error
 
-	for attempt := 1; attempt < maxRetries; attempt++ {
+	for attempt := 1; attempt <= maxRetries; attempt++ {
 		if opType == "credit" {
 			account, history, err = repository.CreditOperation(req.AccountID, req.Currency, req.Value, req.ReferenceID)
+		} else if opType == "debit" {
+			account, history, err = repository.DebitOperation(req.AccountID, req.Currency, req.Value, req.ReferenceID)
 		}
 
 		if err == nil {
@@ -73,7 +78,7 @@ func CreateOperation(ctx *gin.Context) {
 		if !helpers.IsRetryable(err) {
 			break
 		}
-		logger.Warnf("Retryable error on credit ref=%s, attempt %d/%d: %v", req.ReferenceID, attempt, maxRetries, delay)
+		logger.Warnf("Retryable error on operation %s ref=%s, attempt %d/%d: %v - delay ", opType, req.ReferenceID, attempt, maxRetries, err, delay)
 		time.Sleep(delay)
 		delay *= 2
 	}
@@ -86,16 +91,31 @@ func CreateOperation(ctx *gin.Context) {
 		case errors.Is(err, repository.ErrAccountNotFound):
 			handler.SendError(ctx, http.StatusNotFound, "Account not found")
 			return
+		case errors.Is(err, repository.ErrInsufficientFunds):
+			if opType == "debit" {
+				repository.RecordFailedDedit(req.AccountID, req.ReferenceID, req.Value, req.Currency, err)
+			}
+			handler.SendError(ctx, http.StatusUnprocessableEntity, err.Error())
+			return
 		case errors.Is(err, repository.ErrAccountNotActive),
 			errors.Is(err, repository.ErrInvalidCurrency):
-			repository.RecordFailedCredit(req.AccountID, req.ReferenceID, req.Value, req.Currency, err)
+			if opType == "credit" {
+				repository.RecordFailedCredit(req.AccountID, req.ReferenceID, req.Value, req.Currency, err)
+			} else if opType == "debit" {
+				repository.RecordFailedDedit(req.AccountID, req.ReferenceID, req.Value, req.Currency, err)
+			}
 			handler.SendError(ctx, http.StatusUnprocessableEntity, err.Error())
 			return
 		default:
-			logger.Errorf("Credit operation failed after retries: %v", err)
+			logger.Errorf("Operation %s failed after retries: %v", opType, err)
 			handler.SendError(ctx, http.StatusInternalServerError, "Internal error processing operation")
 			return
 		}
+	}
+
+	usedCredit := int64(0)
+	if account.AvailableBalance < 0 {
+		usedCredit = -account.AvailableBalance
 	}
 
 	resp := OperationResponse{
@@ -104,7 +124,10 @@ func CreateOperation(ctx *gin.Context) {
 		Balance:          account.AvailableBalance + account.ReservedBalance,
 		ReservedBalance:  account.ReservedBalance,
 		AvailableBalance: account.AvailableBalance,
+		CreditUsed:       usedCredit,
+		CreditAvailable:  account.CreditLimit - usedCredit,
 		Timestamp:        history.CreatedAt,
+		Type:             opType,
 		ErrorMessage:     nil,
 	}
 	handler.SendSuccess(ctx, "create-operation", "data", resp)
