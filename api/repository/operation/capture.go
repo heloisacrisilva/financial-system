@@ -5,6 +5,7 @@ import (
 	"financial/system/api/config"
 	"financial/system/api/entities"
 	"financial/system/api/helpers"
+	"financial/system/api/repository"
 	"time"
 
 	"gorm.io/gorm"
@@ -24,7 +25,7 @@ func CaptureOperation(accountID string, currency string, value int64, refID stri
 		err := tx.Where("reference_id = ? AND type = ?", refID, TransactionTypeCapture).First(&existing).Error
 
 		if err == nil {
-			return ErrDuplicateRef
+			return repository.ErrDuplicateRef
 		}
 
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -33,25 +34,25 @@ func CaptureOperation(accountID string, currency string, value int64, refID stri
 
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&account, "id = ?", accountID).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return ErrAccountNotFound
+				return repository.ErrAccountNotFound
 			}
 			return err
 		}
 
 		if account.Status != "active" {
-			return ErrAccountNotActive
+			return repository.ErrAccountNotActive
 		}
 
 		if currency != "" && currency != account.Currency {
-			return ErrInvalidCurrency
+			return repository.ErrInvalidCurrency
 		}
 
 		if value <= 0 {
-			return ErrInvalidValue
+			return repository.ErrInvalidValue
 		}
 
 		if value > account.ReservedBalance {
-			return ErrInsufficientFunds
+			return repository.ErrInsufficientFunds
 		}
 
 		account.AvailableBalance += value
@@ -73,7 +74,7 @@ func CaptureOperation(accountID string, currency string, value int64, refID stri
 
 		if err := tx.Create(&history).Error; err != nil {
 			if helpers.IsUniqueViolation(err) {
-				return ErrDuplicateRef
+				return repository.ErrDuplicateRef
 			}
 			return err
 		}
@@ -87,25 +88,4 @@ func CaptureOperation(accountID string, currency string, value int64, refID stri
 
 	return &account, &history, nil
 
-}
-
-// FIXME: generalize all
-func CaptureFailedCapture(accountID, refID string, value int64, currency string, cause error) {
-	db := config.GetPostgres()
-	logger := config.GetLogger()
-	errMsg := cause.Error()
-
-	h := entities.TransactionHistory{
-		AccountID:    accountID,
-		ReferenceID:  refID,
-		Type:         "capture",
-		Value:        value,
-		Currency:     currency,
-		Status:       "failed",
-		ErrorMessage: &errMsg,
-		CreatedAt:    time.Now(),
-	}
-	if err := db.Create(&h).Error; err != nil && !helpers.IsUniqueViolation(err) {
-		logger.Errorf("failed to record failed capture history ref=%s: %v", refID, err)
-	}
 }

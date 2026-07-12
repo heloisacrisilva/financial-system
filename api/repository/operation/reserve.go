@@ -1,18 +1,15 @@
-package repostiory
+package repository
 
 import (
 	"errors"
 	"financial/system/api/config"
 	"financial/system/api/entities"
 	"financial/system/api/helpers"
+	"financial/system/api/repository"
 	"time"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
-)
-
-var (
-	ErrInvalidValue = errors.New("invalid value")
 )
 
 func ReserveOperation(accountID string, currency string, value int64, refID string) (*entities.Account, *entities.TransactionHistory, error) {
@@ -21,13 +18,14 @@ func ReserveOperation(accountID string, currency string, value int64, refID stri
 
 	var account entities.Account
 	var history entities.TransactionHistory
+	const TransactionTypeReserve = "reserve"
 
 	err := db.Transaction(func(tx *gorm.DB) error {
 		var existing entities.TransactionHistory
-		err := tx.Where("reference_id = ?", refID).First(&existing).Error
+		err := tx.Where("reference_id = ? AND type = ?", refID, TransactionTypeReserve).First(&existing).Error
 
 		if err == nil {
-			return ErrDuplicateRef
+			return repository.ErrDuplicateRef
 		}
 
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -36,25 +34,25 @@ func ReserveOperation(accountID string, currency string, value int64, refID stri
 
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&account, "id = ?", accountID).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return ErrAccountNotFound
+				return repository.ErrAccountNotFound
 			}
 			return err
 		}
 
 		if account.Status != "active" {
-			return ErrAccountNotActive
+			return repository.ErrAccountNotActive
 		}
 
 		if currency != "" && currency != account.Currency {
-			return ErrInvalidCurrency
+			return repository.ErrInvalidCurrency
 		}
 
 		if value <= 0 {
-			return ErrInvalidValue
+			return repository.ErrInvalidValue
 		}
 
 		if value > account.AvailableBalance {
-			return ErrInsufficientFunds
+			return repository.ErrInsufficientFunds
 		}
 
 		account.AvailableBalance -= value
@@ -67,7 +65,7 @@ func ReserveOperation(accountID string, currency string, value int64, refID stri
 		history = entities.TransactionHistory{
 			AccountID:   accountID,
 			ReferenceID: refID,
-			Type:        "reserve",
+			Type:        TransactionTypeReserve,
 			Value:       value,
 			Currency:    account.Currency,
 			Status:      "success",
@@ -76,7 +74,7 @@ func ReserveOperation(accountID string, currency string, value int64, refID stri
 
 		if err := tx.Create(&history).Error; err != nil {
 			if helpers.IsUniqueViolation(err) {
-				return ErrDuplicateRef
+				return repository.ErrDuplicateRef
 			}
 			return err
 		}
@@ -84,29 +82,9 @@ func ReserveOperation(accountID string, currency string, value int64, refID stri
 	})
 
 	if err != nil {
-		logger.Errorf("reserve failed account=%s ref=%s: %v", accountID, refID, err)
+		logger.Errorf("%s failed account=%s ref=%s: %v", TransactionTypeReserve, accountID, refID, err)
 		return nil, nil, err
 	}
 
 	return &account, &history, nil
-}
-
-func RecordFailedReserve(accountID, refID string, value int64, currency string, cause error) {
-	db := config.GetPostgres()
-	logger := config.GetLogger()
-	errMsg := cause.Error()
-
-	h := entities.TransactionHistory{
-		AccountID:    accountID,
-		ReferenceID:  refID,
-		Type:         "reserve",
-		Value:        value,
-		Currency:     currency,
-		Status:       "failed",
-		ErrorMessage: &errMsg,
-		CreatedAt:    time.Now(),
-	}
-	if err := db.Create(&h).Error; err != nil && !helpers.IsUniqueViolation(err) {
-		logger.Errorf("failed to record failed reserve history ref=%s: %v", refID, err)
-	}
 }

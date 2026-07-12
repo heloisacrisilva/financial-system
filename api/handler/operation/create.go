@@ -6,6 +6,7 @@ import (
 	"financial/system/api/entities"
 	"financial/system/api/handler"
 	"financial/system/api/helpers"
+	repositoryErrors "financial/system/api/repository"
 	repository "financial/system/api/repository/operation"
 	"net/http"
 	"slices"
@@ -93,33 +94,19 @@ func CreateOperation(ctx *gin.Context) {
 
 	if err != nil {
 		switch {
-		case errors.Is(err, repository.ErrDuplicateRef):
+		case errors.Is(err, repositoryErrors.ErrDuplicateRef):
 			handler.SendError(ctx, http.StatusConflict, "Transaction reference already processed")
 			return
-		case errors.Is(err, repository.ErrAccountNotFound):
+		case errors.Is(err, repositoryErrors.ErrAccountNotFound):
 			handler.SendError(ctx, http.StatusNotFound, "Account not found")
 			return
-		case errors.Is(err, repository.ErrInsufficientFunds):
-			if opType == "debit" {
-				repository.RecordFailedDedit(req.AccountID, req.ReferenceID, req.Value, req.Currency, err)
-			} else if opType == "reserve" {
-				repository.RecordFailedReserve(req.AccountID, req.ReferenceID, req.Value, req.Currency, err)
-			} else if opType == "capture" {
-				repository.RecordFailedReserve(req.AccountID, req.ReferenceID, req.Value, req.Currency, err)
-			}
+		case errors.Is(err, repositoryErrors.ErrInsufficientFunds):
+			repository.RecordFailedOperation(opType, req.AccountID, req.ReferenceID, req.Value, req.Currency, err)
 			handler.SendError(ctx, http.StatusUnprocessableEntity, err.Error())
 			return
-		case errors.Is(err, repository.ErrAccountNotActive),
-			errors.Is(err, repository.ErrInvalidCurrency):
-			if opType == "credit" {
-				repository.RecordFailedCredit(req.AccountID, req.ReferenceID, req.Value, req.Currency, err)
-			} else if opType == "debit" {
-				repository.RecordFailedDedit(req.AccountID, req.ReferenceID, req.Value, req.Currency, err)
-			} else if opType == "reserve" {
-				repository.RecordFailedReserve(req.AccountID, req.ReferenceID, req.Value, req.Currency, err)
-			} else if opType == "capture" {
-				repository.RecordFailedReserve(req.AccountID, req.ReferenceID, req.Value, req.Currency, err)
-			}
+		case errors.Is(err, repositoryErrors.ErrAccountNotActive),
+			errors.Is(err, repositoryErrors.ErrInvalidCurrency):
+			repository.RecordFailedOperation(opType, req.AccountID, req.ReferenceID, req.Value, req.Currency, err)
 			handler.SendError(ctx, http.StatusUnprocessableEntity, err.Error())
 			return
 		default:
