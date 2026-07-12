@@ -8,6 +8,7 @@ import (
 	"financial/system/api/helpers"
 	repository "financial/system/api/repository/operation"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -37,9 +38,9 @@ type OperationResponse struct {
 func CreateOperation(ctx *gin.Context) {
 	logger := config.GetLogger()
 	opType := ctx.Param("type")
+	availableTypes := []string{"debit", "credit", "reserve"}
 
-	//FIXME:
-	if opType != "credit" && opType != "debit" {
+	if !slices.Contains(availableTypes, opType) {
 		handler.SendError(ctx, http.StatusBadRequest, "Invalid operation type.")
 		return
 	}
@@ -65,10 +66,14 @@ func CreateOperation(ctx *gin.Context) {
 	var err error
 
 	for attempt := 1; attempt <= maxRetries; attempt++ {
-		if opType == "credit" {
+
+		switch opType {
+		case "credit":
 			account, history, err = repository.CreditOperation(req.AccountID, req.Currency, req.Value, req.ReferenceID)
-		} else if opType == "debit" {
+		case "debit":
 			account, history, err = repository.DebitOperation(req.AccountID, req.Currency, req.Value, req.ReferenceID)
+		case "reserve":
+			account, history, err = repository.ReserveOperation(req.AccountID, req.Currency, req.Value, req.ReferenceID)
 		}
 
 		if err == nil {
@@ -94,6 +99,8 @@ func CreateOperation(ctx *gin.Context) {
 		case errors.Is(err, repository.ErrInsufficientFunds):
 			if opType == "debit" {
 				repository.RecordFailedDedit(req.AccountID, req.ReferenceID, req.Value, req.Currency, err)
+			} else if opType == "reserve" {
+				repository.RecordFailedReserve(req.AccountID, req.ReferenceID, req.Value, req.Currency, err)
 			}
 			handler.SendError(ctx, http.StatusUnprocessableEntity, err.Error())
 			return
@@ -103,6 +110,8 @@ func CreateOperation(ctx *gin.Context) {
 				repository.RecordFailedCredit(req.AccountID, req.ReferenceID, req.Value, req.Currency, err)
 			} else if opType == "debit" {
 				repository.RecordFailedDedit(req.AccountID, req.ReferenceID, req.Value, req.Currency, err)
+			} else if opType == "reserve" {
+				repository.RecordFailedReserve(req.AccountID, req.ReferenceID, req.Value, req.Currency, err)
 			}
 			handler.SendError(ctx, http.StatusUnprocessableEntity, err.Error())
 			return
