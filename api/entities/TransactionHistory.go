@@ -8,9 +8,9 @@ import (
 
 type TransactionHistory struct {
 	ID              uint64  `gorm:"primaryKey;autoIncrement"`
-	AccountID       uint64  `gorm:"not null;index;uniqueIndex:idx_ref_account"`
+	AccountID       uint64  `gorm:"not null;index"`
 	Account         Account `gorm:"foreignKey:AccountID;references:ID;OnDelete:RESTRICT"`
-	ReferenceID     string  `gorm:"type:varchar(100);not null;uniqueIndex:idx_ref_account"`
+	ReferenceID     string  `gorm:"type:varchar(100);not null;index"`
 	TransferGroupID *string `gorm:"index"`
 	RelatedTxID     *uint64 `gorm:"index"`
 	Type            string  `gorm:"not null;check:type IN ('credit', 'debit', 'reserve', 'capture', 'reversal', 'transfer')"`

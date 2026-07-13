@@ -52,11 +52,23 @@ func InitializeConnectDB(logger *Logger) (*gorm.DB, error) {
 	models := []interface{}{
 		&entities.Account{},
 		&entities.Client{},
+		&entities.OperationReference{},
 		&entities.TransactionHistory{},
 	}
 
 	if err := db.AutoMigrate(models...); err != nil {
 		logger.Errorf("Failed to migrate models: %v", err)
+		return nil, err
+	}
+
+	if err := db.Exec(`
+		INSERT INTO operation_references (reference_id, created_at)
+		SELECT reference_id, MIN(created_at)
+		FROM transaction_histories
+		GROUP BY reference_id
+		ON CONFLICT (reference_id) DO NOTHING
+	`).Error; err != nil {
+		logger.Errorf("Failed to backfill operation references: %v", err)
 		return nil, err
 	}
 

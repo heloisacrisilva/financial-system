@@ -21,14 +21,7 @@ func ReserveOperation(accountID uint64, currency string, value int64, refID stri
 	const TransactionTypeReserve = "reserve"
 
 	err := db.Transaction(func(tx *gorm.DB) error {
-		var existing entities.TransactionHistory
-		err := tx.Where("reference_id = ? AND type = ?", refID, TransactionTypeReserve).First(&existing).Error
-
-		if err == nil {
-			return repository.ErrDuplicateRef
-		}
-
-		if !errors.Is(err, gorm.ErrRecordNotFound) {
+		if err := reserveReferenceID(tx, refID); err != nil {
 			return err
 		}
 

@@ -23,6 +23,10 @@ func ReversalOperation(originalRefID string, refID string, requestedValue int64)
 	var histories []entities.TransactionHistory
 
 	err := db.Transaction(func(tx *gorm.DB) error {
+		if err := reserveReferenceID(tx, refID); err != nil {
+			return err
+		}
+
 		var originals []entities.TransactionHistory
 		if err := tx.Where("reference_id = ?", originalRefID).Find(&originals).Error; err != nil {
 			return err

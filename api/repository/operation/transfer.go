@@ -26,15 +26,7 @@ func TransferOperation(accountOrigID uint64, accountDestID uint64, currency stri
 			return repository.ErrSameAccount
 		}
 
-		var existing entities.TransactionHistory
-		err := tx.Where("reference_id = ? AND account_id = ? AND type = ?",
-			refID, accountOrigID, TransactionTypeTransfer).
-			First(&existing).Error
-
-		if err == nil {
-			return repository.ErrDuplicateRef
-		}
-		if !errors.Is(err, gorm.ErrRecordNotFound) {
+		if err := reserveReferenceID(tx, refID); err != nil {
 			return err
 		}
 
