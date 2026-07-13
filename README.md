@@ -50,11 +50,15 @@ http://localhost:8080
 
 ## Testes
 
-```bash
-go test ./...
-```
+O projeto conta com testes unitários automatizados para a camada de HTTP (`handlers`), cobrindo fluxos de sucesso, falhas de validação de payload e regras de negócio. 
 
-Neste momento o projeto compila todos os pacotes, mas ainda não possui arquivos `*_test.go`. A próxima evolução recomendada é adicionar testes unitários para regras de operação e testes de integração com PostgreSQL.
+Os testes utilizam a técnica de substituição de funções por variáveis locais (Mocking de escopo síncrono), o que garante o isolamento da infraestrutura (os testes rodam instantaneamente sem precisar que o PostgreSQL esteja de pé).
+
+Para rodar todos os testes do projeto com o log detalhado de cada cenário:
+
+```bash
+go test ./... -v
+```
 
 ## Swagger / OpenAPI
 
@@ -291,4 +295,4 @@ O projeto possui logs para:
 
 ## Limitações Conhecidas
 
-- Ainda não há de integração automatizados.
+- Ainda não há testes de integração automatizados que batam diretamente no banco de dados real (PostgreSQL) ou testes específicos para a camada de persistência (`repository`).
