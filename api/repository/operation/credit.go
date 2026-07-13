@@ -12,7 +12,7 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-func CreditOperation(accountID string, currency string, value int64, refID string) (*entities.Account, *entities.TransactionHistory, error) {
+func CreditOperation(accountID uint64, currency string, value int64, refID string) (*entities.Account, *entities.TransactionHistory, error) {
 	db := config.GetPostgres()
 	logger := config.GetLogger()
 
@@ -72,7 +72,7 @@ func CreditOperation(accountID string, currency string, value int64, refID strin
 		return nil
 	})
 	if err != nil {
-		logger.Errorf("%s failed account=%s ref=%s: %v", TransactionTypeCredit, accountID, refID, err)
+		logger.Errorf("%s failed account=%d ref=%s: %v", TransactionTypeCredit, accountID, refID, err)
 		return nil, nil, err
 	}
 	return &account, &history, nil

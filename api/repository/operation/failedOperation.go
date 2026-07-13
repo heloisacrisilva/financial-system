@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-func RecordFailedOperation(typeOpt string, accountID, refID string, value int64, currency string, cause error) {
+func RecordFailedOperation(typeOpt string, accountID uint64, refID string, value int64, currency string, cause error) {
 	db := config.GetPostgres()
 	logger := config.GetLogger()
 	errMsg := cause.Error()

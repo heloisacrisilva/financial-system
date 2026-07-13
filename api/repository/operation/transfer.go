@@ -13,7 +13,7 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-func TransferOperation(accountOrigID string, accountDestID string, currency string, value int64, refID string) ([]entities.TransactionHistory, *entities.Account, *entities.Account, error) {
+func TransferOperation(accountOrigID uint64, accountDestID uint64, currency string, value int64, refID string) ([]entities.TransactionHistory, *entities.Account, *entities.Account, error) {
 	db := config.GetPostgres()
 	logger := config.GetLogger()
 
@@ -98,7 +98,7 @@ func TransferOperation(accountOrigID string, accountDestID string, currency stri
 			AccountID:       accountOrigID,
 			ReferenceID:     refID,
 			Type:            TransactionTypeTransfer,
-			Direction:       strPtr("debit"),
+			Direction:       helpers.StrPtr("debit"),
 			Value:           value,
 			Currency:        originAccount.Currency,
 			Status:          "success",
@@ -116,7 +116,7 @@ func TransferOperation(accountOrigID string, accountDestID string, currency stri
 			AccountID:       accountDestID,
 			ReferenceID:     refID,
 			Type:            TransactionTypeTransfer,
-			Direction:       strPtr("credit"),
+			Direction:       helpers.StrPtr("credit"),
 			Value:           value,
 			Currency:        destAccount.Currency,
 			Status:          "success",
@@ -140,7 +140,7 @@ func TransferOperation(accountOrigID string, accountDestID string, currency stri
 	})
 
 	if err != nil {
-		logger.Errorf("%s failed orig=%s dest=%s ref=%s: %v",
+		logger.Errorf("%s failed orig=%d dest=%d ref=%s: %v",
 			TransactionTypeTransfer, accountOrigID, accountDestID, refID, err)
 		return nil, nil, nil, err
 	}
@@ -157,5 +157,3 @@ func validateAccountForTransfer(acc entities.Account, currency string) error {
 	}
 	return nil
 }
-
-func strPtr(s string) *string { return &s }
