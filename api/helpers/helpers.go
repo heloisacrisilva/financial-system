@@ -25,3 +25,5 @@ func IsRetryable(err error) bool {
 	}
 	return false
 }
+
+func StrPtr(s string) *string { return &s }

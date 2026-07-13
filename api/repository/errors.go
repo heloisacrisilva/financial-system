@@ -17,6 +17,18 @@ var (
 	ErrCreditLimitExceeded = errors.New("credit operation exceeds the allowed limit")
 )
 
+// Transaction errors
+var (
+	ErrTransactionNotFound      = errors.New("original transaction not found")
+	ErrAlreadyReversed          = errors.New("transaction has already been reversed")
+	ErrTransactionNotReversible = errors.New("transaction type or status does not support reversal")
+)
+
+// Reversal erros
+var (
+	ErrReversalValueMismatch = errors.New("reversal value must be the same of original value operation")
+)
+
 // Idempotency errors
 var (
 	ErrDuplicateRef = errors.New("reference_id already processed")

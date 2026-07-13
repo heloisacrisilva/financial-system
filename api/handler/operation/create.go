@@ -17,11 +17,12 @@ import (
 )
 
 type OperationRequest struct {
-	AccountID     string `json:"account_id" binding:"required"`
-	AccountDestID string `json:"account_dest_id"`
-	Value         int64  `json:"value" binding:"required,gt=0"`
-	Currency      string `json:"currency"`
-	ReferenceID   string `json:"reference_id" binding:"required"`
+	AccountID           uint64 `json:"account_id"`
+	AccountDestID       uint64 `json:"account_dest_id"`
+	OriginalReferenceID string `json:"original_reference_id"`
+	Value               int64  `json:"value"`
+	Currency            string `json:"currency"`
+	ReferenceID         string `json:"reference_id" binding:"required"`
 }
 
 type OperationResponse struct {
@@ -54,6 +55,25 @@ type TransferOperationResponse struct {
 	TransferGroupID *string   `json:"transfer_group_id"`
 }
 
+type ReversalAccountResult struct {
+	AccountID        uint64 `json:"account_id"`
+	Balance          int64  `json:"balance"`
+	AvailableBalance int64  `json:"available_balance"`
+	ReservedBalance  int64  `json:"reserved_balance"`
+}
+
+type ReversalOperationResponse struct {
+	TransactionID   string                  `json:"transaction_id"`
+	Status          string                  `json:"status"`
+	Type            string                  `json:"type"`
+	Timestamp       time.Time               `json:"timestamp"`
+	ErrorMessage    *string                 `json:"error_message"`
+	OriginalRefID   string                  `json:"original_reference_id"`
+	ReversalTxIDs   []uint64                `json:"reversal_tx_ids"`
+	TransferGroupID *string                 `json:"transfer_group_id,omitempty"`
+	Accounts        []ReversalAccountResult `json:"accounts"`
+}
+
 func CreateOperation(ctx *gin.Context) {
 	logger := config.GetLogger()
 	opType := ctx.Param("type")
@@ -71,7 +91,7 @@ func CreateOperation(ctx *gin.Context) {
 		return
 	}
 
-	if err := req.OperationValidate(); err != nil {
+	if err := req.OperationValidate(opType); err != nil {
 		logger.Errorf("Validation failed: %v", err)
 		handler.SendError(ctx, http.StatusBadRequest, err.Error())
 		return
@@ -84,6 +104,8 @@ func CreateOperation(ctx *gin.Context) {
 	var account *entities.Account
 	var history *entities.TransactionHistory
 	var transferHistories []entities.TransactionHistory
+	var reversalAccounts []*entities.Account
+	var reversalHistories []entities.TransactionHistory
 	var err error
 
 	for attempt := 1; attempt <= maxRetries; attempt++ {
@@ -99,6 +121,8 @@ func CreateOperation(ctx *gin.Context) {
 			account, history, err = repository.CaptureOperation(req.AccountID, req.Currency, req.Value, req.ReferenceID)
 		case "transfer":
 			transferHistories, originAccount, destAccount, err = repository.TransferOperation(req.AccountID, req.AccountDestID, req.Currency, req.Value, req.ReferenceID)
+		case "reversal":
+			reversalAccounts, reversalHistories, err = repository.ReversalOperation(req.OriginalReferenceID, req.ReferenceID, req.Value)
 		}
 
 		if err == nil {
@@ -108,7 +132,7 @@ func CreateOperation(ctx *gin.Context) {
 		if !helpers.IsRetryable(err) {
 			break
 		}
-		logger.Warnf("Retryable error on operation %s ref=%s, attempt %d/%d: %v - delay ", opType, req.ReferenceID, attempt, maxRetries, err, delay)
+		logger.Warnf("Retryable error on operation %s ref=%s, attempt %d/%d: %v - delay %v", opType, req.ReferenceID, attempt, maxRetries, err, delay)
 		time.Sleep(delay)
 		delay *= 2
 	}
@@ -120,6 +144,21 @@ func CreateOperation(ctx *gin.Context) {
 			return
 		case errors.Is(err, repositoryErrors.ErrAccountNotFound):
 			handler.SendError(ctx, http.StatusNotFound, "Account not found")
+			return
+		case errors.Is(err, repositoryErrors.ErrSameAccount):
+			handler.SendError(ctx, http.StatusUnprocessableEntity, err.Error())
+			return
+		case errors.Is(err, repositoryErrors.ErrTransactionNotFound):
+			handler.SendError(ctx, http.StatusNotFound, "Original transaction not found")
+			return
+		case errors.Is(err, repositoryErrors.ErrAlreadyReversed):
+			handler.SendError(ctx, http.StatusConflict, "Transaction has already been reversed")
+			return
+		case errors.Is(err, repositoryErrors.ErrTransactionNotReversible):
+			handler.SendError(ctx, http.StatusUnprocessableEntity, err.Error())
+			return
+		case errors.Is(err, repositoryErrors.ErrReversalValueMismatch):
+			handler.SendError(ctx, http.StatusUnprocessableEntity, err.Error())
 			return
 		case errors.Is(err, repositoryErrors.ErrInsufficientFunds):
 			repository.RecordFailedOperation(opType, req.AccountID, req.ReferenceID, req.Value, req.Currency, err)
@@ -137,7 +176,8 @@ func CreateOperation(ctx *gin.Context) {
 		}
 	}
 
-	if opType == "transfer" {
+	switch opType {
+	case "transfer":
 		debit, credit := transferHistories[0], transferHistories[1]
 
 		usedCredit := int64(0)
@@ -163,6 +203,38 @@ func CreateOperation(ctx *gin.Context) {
 		}
 		handler.SendSuccess(ctx, "create-operation", "data", resp)
 		return
+
+	case "reversal":
+		accountsResp := make([]ReversalAccountResult, 0, len(reversalAccounts))
+		for _, acc := range reversalAccounts {
+			accountsResp = append(accountsResp, ReversalAccountResult{
+				AccountID:        acc.ID,
+				Balance:          acc.AvailableBalance + acc.ReservedBalance,
+				AvailableBalance: acc.AvailableBalance,
+				ReservedBalance:  acc.ReservedBalance,
+			})
+		}
+
+		txIDs := make([]uint64, 0, len(reversalHistories))
+		for _, h := range reversalHistories {
+			txIDs = append(txIDs, h.ID)
+		}
+
+		first := reversalHistories[0]
+
+		resp := ReversalOperationResponse{
+			TransactionID:   first.ReferenceID + "-PROCESSED",
+			Status:          first.Status,
+			Type:            opType,
+			Timestamp:       first.CreatedAt,
+			ErrorMessage:    nil,
+			OriginalRefID:   req.OriginalReferenceID,
+			ReversalTxIDs:   txIDs,
+			TransferGroupID: first.TransferGroupID,
+			Accounts:        accountsResp,
+		}
+		handler.SendSuccess(ctx, "create-operation", "data", resp)
+		return
 	}
 
 	usedCredit := int64(0)
@@ -185,23 +257,39 @@ func CreateOperation(ctx *gin.Context) {
 	handler.SendSuccess(ctx, "create-operation", "data", resp)
 }
 
-func (r *OperationRequest) OperationValidate() error {
-	r.AccountID = strings.TrimSpace(r.AccountID)
-	if r.AccountID == "" {
-		return handler.ErrParamIsRequired("account_id", "string")
+func (r *OperationRequest) OperationValidate(opType string) error {
+	r.ReferenceID = strings.TrimSpace(r.ReferenceID)
+	if r.ReferenceID == "" {
+		return handler.ErrParamIsRequired("reference_id", "string")
+	}
+
+	if opType == "reversal" {
+		r.OriginalReferenceID = strings.TrimSpace(r.OriginalReferenceID)
+		if r.OriginalReferenceID == "" {
+			return handler.ErrParamIsRequired("original_reference_id", "string")
+		}
+		return nil
 	}
 
 	if r.Value <= 0 {
 		return handler.ErrInvalidParam("value", "int64")
 	}
 
-	r.ReferenceID = strings.TrimSpace(r.ReferenceID)
-	if r.ReferenceID == "" {
-		return handler.ErrParamIsRequired("reference_id", "string")
+	if r.AccountID == 0 {
+		return handler.ErrParamIsRequired("account_id", "uint64")
 	}
 
 	if r.Currency != "" && len(r.Currency) != 3 {
 		return handler.ErrInvalidParam("currency", "string")
+	}
+
+	if opType == "transfer" {
+		if r.AccountDestID == 0 {
+			return handler.ErrParamIsRequired("account_dest_id", "uint64")
+		}
+		if r.AccountDestID == r.AccountID {
+			return handler.ErrInvalidParam("account_dest_id", "uint64")
+		}
 	}
 
 	return nil
