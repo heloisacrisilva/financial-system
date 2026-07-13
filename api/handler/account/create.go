@@ -34,9 +34,7 @@ func CreateAccountHandler(ctx *gin.Context) {
 		handler.SendError(ctx, http.StatusBadRequest, err.Error())
 		return
 	}
-	//TEST:
 	account, err := createAccountDbFunc(request.Name, request.Email, request.CPF)
-	// account, err := repository.CreateAccountRepository(request.Name, request.Email, request.CPF)
 	if err != nil {
 		logger.Errorf("Error creating account: %v", err)
 

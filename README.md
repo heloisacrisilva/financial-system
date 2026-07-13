@@ -291,4 +291,4 @@ O projeto possui logs para:
 
 ## Limitações Conhecidas
 
-- Ainda não há testes unitários e de integração automatizados.
+- Ainda não há de integração automatizados.

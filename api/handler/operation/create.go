@@ -124,29 +124,17 @@ func CreateOperation(ctx *gin.Context) {
 
 		switch opType {
 		case "credit":
-			//TEST
 			account, history, err = creditOperationDbFunc(req.AccountID, req.Currency, req.Value, req.ReferenceID)
-			// account, history, err = repository.CreditOperation(req.AccountID, req.Currency, req.Value, req.ReferenceID)
 		case "debit":
-			//TEST
 			account, history, err = debitOperationDbFunc(req.AccountID, req.Currency, req.Value, req.ReferenceID)
-			// account, history, err = repository.DebitOperation(req.AccountID, req.Currency, req.Value, req.ReferenceID)
 		case "reserve":
-			//TEST
 			account, history, err = reserveOperationDbFunc(req.AccountID, req.Currency, req.Value, req.ReferenceID)
-			// account, history, err = repository.ReserveOperation(req.AccountID, req.Currency, req.Value, req.ReferenceID)
 		case "capture":
-			//TEST
 			account, history, err = captureOperationDbFunc(req.AccountID, req.Currency, req.Value, req.ReferenceID)
-			// account, history, err = repository.CaptureOperation(req.AccountID, req.Currency, req.Value, req.ReferenceID)
 		case "transfer":
-			//TEST
 			transferHistories, originAccount, destAccount, err = transferOperationDbFunc(req.AccountID, req.AccountDestID, req.Currency, req.Value, req.ReferenceID)
-			// transferHistories, originAccount, destAccount, err = repository.TransferOperation(req.AccountID, req.AccountDestID, req.Currency, req.Value, req.ReferenceID)
 		case "reversal":
-			//TEST
 			reversalAccounts, reversalHistories, err = reversalOperationDbFunc(req.OriginalReferenceID, req.ReferenceID, req.Value)
-			// reversalAccounts, reversalHistories, err = repository.ReversalOperation(req.OriginalReferenceID, req.ReferenceID, req.Value)
 		}
 
 		if err == nil {
@@ -185,16 +173,12 @@ func CreateOperation(ctx *gin.Context) {
 			handler.SendError(ctx, http.StatusUnprocessableEntity, err.Error())
 			return
 		case errors.Is(err, repositoryErrors.ErrInsufficientFunds):
-			//TEST
 			recordFailedOperationDbFunc(opType, req.AccountID, req.ReferenceID, req.Value, req.Currency, err)
-			// repository.RecordFailedOperation(opType, req.AccountID, req.ReferenceID, req.Value, req.Currency, err)
 			handler.SendError(ctx, http.StatusUnprocessableEntity, err.Error())
 			return
 		case errors.Is(err, repositoryErrors.ErrAccountNotActive),
 			errors.Is(err, repositoryErrors.ErrInvalidCurrency):
-			//TEST
 			recordFailedOperationDbFunc(opType, req.AccountID, req.ReferenceID, req.Value, req.Currency, err)
-			// repository.RecordFailedOperation(opType, req.AccountID, req.ReferenceID, req.Value, req.Currency, err)
 			handler.SendError(ctx, http.StatusUnprocessableEntity, err.Error())
 			return
 		default:

@@ -23,9 +23,7 @@ func GetClientByID(ctx *gin.Context) {
 		return
 	}
 
-	//TEST
 	client, err := getClientDbFunc(clientID)
-	// client, err := repository.GetClientRepository(clientID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			logger.Warnf("Client with ID %s not found.", clientID)

@@ -45,9 +45,7 @@ func GetOperationByID(ctx *gin.Context) {
 		handler.SendError(ctx, http.StatusBadRequest, handler.ErrInvalidParam("ID", "routeParameter").Error())
 		return
 	}
-	//TEST
 	history, err := getOperationHistoryByIDDbFunc(operationID)
-	// history, err := repository.GetOperationHistoryByID(operationID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			handler.SendError(ctx, http.StatusNotFound, "Operation history not found.")
