@@ -13,6 +13,8 @@ import (
 func TestGetHealthHandler(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
+	config.InitLogger("[Test GET]")
+
 	type testCase struct {
 		name              string
 		mockDbHealthy     bool

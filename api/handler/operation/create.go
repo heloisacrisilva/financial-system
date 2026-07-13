@@ -17,6 +17,14 @@ import (
 	"github.com/google/uuid"
 )
 
+var creditOperationDbFunc = repository.CreditOperation
+var debitOperationDbFunc = repository.DebitOperation
+var reserveOperationDbFunc = repository.ReserveOperation
+var captureOperationDbFunc = repository.CaptureOperation
+var transferOperationDbFunc = repository.TransferOperation
+var reversalOperationDbFunc = repository.ReversalOperation
+var recordFailedOperationDbFunc = repository.RecordFailedOperation
+
 type OperationRequest struct {
 	AccountID           uint64 `json:"account_id"`
 	AccountDestID       uint64 `json:"account_dest_id"`
@@ -116,17 +124,29 @@ func CreateOperation(ctx *gin.Context) {
 
 		switch opType {
 		case "credit":
-			account, history, err = repository.CreditOperation(req.AccountID, req.Currency, req.Value, req.ReferenceID)
+			//TEST
+			account, history, err = creditOperationDbFunc(req.AccountID, req.Currency, req.Value, req.ReferenceID)
+			// account, history, err = repository.CreditOperation(req.AccountID, req.Currency, req.Value, req.ReferenceID)
 		case "debit":
-			account, history, err = repository.DebitOperation(req.AccountID, req.Currency, req.Value, req.ReferenceID)
+			//TEST
+			account, history, err = debitOperationDbFunc(req.AccountID, req.Currency, req.Value, req.ReferenceID)
+			// account, history, err = repository.DebitOperation(req.AccountID, req.Currency, req.Value, req.ReferenceID)
 		case "reserve":
-			account, history, err = repository.ReserveOperation(req.AccountID, req.Currency, req.Value, req.ReferenceID)
+			//TEST
+			account, history, err = reserveOperationDbFunc(req.AccountID, req.Currency, req.Value, req.ReferenceID)
+			// account, history, err = repository.ReserveOperation(req.AccountID, req.Currency, req.Value, req.ReferenceID)
 		case "capture":
-			account, history, err = repository.CaptureOperation(req.AccountID, req.Currency, req.Value, req.ReferenceID)
+			//TEST
+			account, history, err = captureOperationDbFunc(req.AccountID, req.Currency, req.Value, req.ReferenceID)
+			// account, history, err = repository.CaptureOperation(req.AccountID, req.Currency, req.Value, req.ReferenceID)
 		case "transfer":
-			transferHistories, originAccount, destAccount, err = repository.TransferOperation(req.AccountID, req.AccountDestID, req.Currency, req.Value, req.ReferenceID)
+			//TEST
+			transferHistories, originAccount, destAccount, err = transferOperationDbFunc(req.AccountID, req.AccountDestID, req.Currency, req.Value, req.ReferenceID)
+			// transferHistories, originAccount, destAccount, err = repository.TransferOperation(req.AccountID, req.AccountDestID, req.Currency, req.Value, req.ReferenceID)
 		case "reversal":
-			reversalAccounts, reversalHistories, err = repository.ReversalOperation(req.OriginalReferenceID, req.ReferenceID, req.Value)
+			//TEST
+			reversalAccounts, reversalHistories, err = reversalOperationDbFunc(req.OriginalReferenceID, req.ReferenceID, req.Value)
+			// reversalAccounts, reversalHistories, err = repository.ReversalOperation(req.OriginalReferenceID, req.ReferenceID, req.Value)
 		}
 
 		if err == nil {
@@ -165,12 +185,16 @@ func CreateOperation(ctx *gin.Context) {
 			handler.SendError(ctx, http.StatusUnprocessableEntity, err.Error())
 			return
 		case errors.Is(err, repositoryErrors.ErrInsufficientFunds):
-			repository.RecordFailedOperation(opType, req.AccountID, req.ReferenceID, req.Value, req.Currency, err)
+			//TEST
+			recordFailedOperationDbFunc(opType, req.AccountID, req.ReferenceID, req.Value, req.Currency, err)
+			// repository.RecordFailedOperation(opType, req.AccountID, req.ReferenceID, req.Value, req.Currency, err)
 			handler.SendError(ctx, http.StatusUnprocessableEntity, err.Error())
 			return
 		case errors.Is(err, repositoryErrors.ErrAccountNotActive),
 			errors.Is(err, repositoryErrors.ErrInvalidCurrency):
-			repository.RecordFailedOperation(opType, req.AccountID, req.ReferenceID, req.Value, req.Currency, err)
+			//TEST
+			recordFailedOperationDbFunc(opType, req.AccountID, req.ReferenceID, req.Value, req.Currency, err)
+			// repository.RecordFailedOperation(opType, req.AccountID, req.ReferenceID, req.Value, req.Currency, err)
 			handler.SendError(ctx, http.StatusUnprocessableEntity, err.Error())
 			return
 		default:

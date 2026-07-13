@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"financial/system/api/config"
 	"financial/system/api/entities"
 	repository "financial/system/api/repository/operation"
 
@@ -16,6 +17,8 @@ import (
 
 func TestGetOperationByIDHandler(t *testing.T) {
 	gin.SetMode(gin.TestMode)
+
+	config.InitLogger("[Test GET]")
 
 	type testCase struct {
 		name           string
