@@ -17,10 +17,11 @@ import (
 )
 
 type OperationRequest struct {
-	AccountID   string `json:"account_id" binding:"required"`
-	Value       int64  `json:"value" binding:"required,gt=0"`
-	Currency    string `json:"currency"`
-	ReferenceID string `json:"reference_id" binding:"required"`
+	AccountID     string `json:"account_id" binding:"required"`
+	AccountDestID string `json:"account_dest_id"`
+	Value         int64  `json:"value" binding:"required,gt=0"`
+	Currency      string `json:"currency"`
+	ReferenceID   string `json:"reference_id" binding:"required"`
 }
 
 type OperationResponse struct {
@@ -36,10 +37,27 @@ type OperationResponse struct {
 	Type             string    `json:"type"`
 }
 
+type TransferOperationResponse struct {
+	TransactionID   string    `json:"transaction_id"`
+	Status          string    `json:"status"`
+	Type            string    `json:"type"`
+	OriginAccountID uint64    `json:"origin_account_id"`
+	DestAccountID   uint64    `json:"dest_account_id"`
+	OriginBalance   int64     `json:"origin_balance"`
+	DestBalance     int64     `json:"dest_balance"`
+	CreditUsed      int64     `json:"credit_used"`
+	CreditAvailable int64     `json:"credit_available"`
+	Timestamp       time.Time `json:"timestamp"`
+	ErrorMessage    *string   `json:"error_message"`
+	DebitTxID       uint64    `json:"debit_tx_id"`
+	CreditTxID      uint64    `json:"credit_tx_id"`
+	TransferGroupID *string   `json:"transfer_group_id"`
+}
+
 func CreateOperation(ctx *gin.Context) {
 	logger := config.GetLogger()
 	opType := ctx.Param("type")
-	availableTypes := []string{"debit", "credit", "reserve", "capture"}
+	availableTypes := []string{"debit", "credit", "reserve", "capture", "reversal", "transfer"}
 
 	if !slices.Contains(availableTypes, opType) {
 		handler.SendError(ctx, http.StatusBadRequest, "Invalid operation type.")
@@ -62,8 +80,10 @@ func CreateOperation(ctx *gin.Context) {
 	const maxRetries = 3
 	delay := 100 * time.Millisecond
 
+	var originAccount, destAccount *entities.Account
 	var account *entities.Account
 	var history *entities.TransactionHistory
+	var transferHistories []entities.TransactionHistory
 	var err error
 
 	for attempt := 1; attempt <= maxRetries; attempt++ {
@@ -75,9 +95,10 @@ func CreateOperation(ctx *gin.Context) {
 			account, history, err = repository.DebitOperation(req.AccountID, req.Currency, req.Value, req.ReferenceID)
 		case "reserve":
 			account, history, err = repository.ReserveOperation(req.AccountID, req.Currency, req.Value, req.ReferenceID)
-
 		case "capture":
 			account, history, err = repository.CaptureOperation(req.AccountID, req.Currency, req.Value, req.ReferenceID)
+		case "transfer":
+			transferHistories, originAccount, destAccount, err = repository.TransferOperation(req.AccountID, req.AccountDestID, req.Currency, req.Value, req.ReferenceID)
 		}
 
 		if err == nil {
@@ -114,6 +135,34 @@ func CreateOperation(ctx *gin.Context) {
 			handler.SendError(ctx, http.StatusInternalServerError, "Internal error processing operation")
 			return
 		}
+	}
+
+	if opType == "transfer" {
+		debit, credit := transferHistories[0], transferHistories[1]
+
+		usedCredit := int64(0)
+		if originAccount.AvailableBalance < 0 {
+			usedCredit = -originAccount.AvailableBalance
+		}
+
+		resp := TransferOperationResponse{
+			TransactionID:   debit.ReferenceID + "-PROCESSED",
+			Status:          debit.Status,
+			Type:            opType,
+			OriginAccountID: originAccount.ID,
+			DestAccountID:   destAccount.ID,
+			OriginBalance:   originAccount.AvailableBalance + originAccount.ReservedBalance,
+			DestBalance:     destAccount.AvailableBalance + destAccount.ReservedBalance,
+			CreditUsed:      usedCredit,
+			CreditAvailable: originAccount.CreditLimit - usedCredit,
+			Timestamp:       debit.CreatedAt,
+			ErrorMessage:    nil,
+			DebitTxID:       debit.ID,
+			CreditTxID:      credit.ID,
+			TransferGroupID: debit.TransferGroupID,
+		}
+		handler.SendSuccess(ctx, "create-operation", "data", resp)
+		return
 	}
 
 	usedCredit := int64(0)

@@ -8,6 +8,7 @@ var (
 	ErrAccountNotActive = errors.New("account is not active")
 	ErrInvalidCurrency  = errors.New("currency mismatch")
 	ErrInvalidValue     = errors.New("value must be greater than zero")
+	ErrSameAccount      = errors.New("origin and destination accounts must be different")
 )
 
 // Credit/balance errors
