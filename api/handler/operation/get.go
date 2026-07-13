@@ -15,6 +15,8 @@ import (
 	"gorm.io/gorm"
 )
 
+var getOperationHistoryByIDDbFunc = repository.GetOperationHistoryByID
+
 type OperationHistoryResponse struct {
 	ID              uint64         `json:"id"`
 	AccountID       uint64         `json:"account_id"`
@@ -43,8 +45,7 @@ func GetOperationByID(ctx *gin.Context) {
 		handler.SendError(ctx, http.StatusBadRequest, handler.ErrInvalidParam("ID", "routeParameter").Error())
 		return
 	}
-
-	history, err := repository.GetOperationHistoryByID(operationID)
+	history, err := getOperationHistoryByIDDbFunc(operationID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			handler.SendError(ctx, http.StatusNotFound, "Operation history not found.")
