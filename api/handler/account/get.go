@@ -11,6 +11,8 @@ import (
 	"gorm.io/gorm"
 )
 
+var getAccountDbFunc = repository.GetAccountRepository
+
 func GetAccountByID(ctx *gin.Context) {
 	logger := config.GetLogger()
 
@@ -21,7 +23,7 @@ func GetAccountByID(ctx *gin.Context) {
 		return
 	}
 
-	account, err := repository.GetAccountRepository(accountID)
+	account, err := getAccountDbFunc(accountID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			logger.Warnf("Account with ID %s not found.", accountID)
