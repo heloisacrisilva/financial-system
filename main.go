@@ -1,7 +1,9 @@
 package main
 
 import (
+	"context"
 	"financial/system/api/config"
+	"financial/system/api/events"
 	"financial/system/api/router"
 	"log"
 
@@ -25,5 +27,6 @@ func main() {
 	logger = config.GetLogger()
 
 	logger.Info("Starting server...")
+	events.StartDispatcher(context.Background())
 	router.Initialize()
 }

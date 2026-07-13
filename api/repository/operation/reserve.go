@@ -71,6 +71,17 @@ func ReserveOperation(accountID uint64, currency string, value int64, refID stri
 			}
 			return err
 		}
+		if err := enqueueOperationEvent(tx, "operation.reserve.success", refID, map[string]interface{}{
+			"transaction_id":    history.ID,
+			"account_id":        account.ID,
+			"value":             value,
+			"currency":          account.Currency,
+			"available_balance": account.AvailableBalance,
+			"reserved_balance":  account.ReservedBalance,
+			"status":            history.Status,
+		}); err != nil {
+			return err
+		}
 		return nil
 	})
 

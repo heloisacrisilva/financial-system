@@ -121,6 +121,16 @@ func reverseSimpleOperation(tx *gorm.DB, original entities.TransactionHistory, r
 		}
 		return err
 	}
+	if err := enqueueOperationEvent(tx, "operation.reversal.success", refID, map[string]interface{}{
+		"transaction_id":          hist.ID,
+		"original_transaction_id": original.ID,
+		"account_id":              account.ID,
+		"value":                   original.Value,
+		"currency":                original.Currency,
+		"status":                  hist.Status,
+	}); err != nil {
+		return err
+	}
 
 	*accounts = append(*accounts, &account)
 	*histories = append(*histories, hist)
@@ -226,6 +236,20 @@ func reverseTransferOperation(tx *gorm.DB, originals []entities.TransactionHisto
 		if helpers.IsUniqueViolation(err) {
 			return repositoryErrors.ErrDuplicateRef
 		}
+		return err
+	}
+	if err := enqueueOperationEvent(tx, "operation.reversal.success", refID, map[string]interface{}{
+		"debit_transaction_id":  debitRev.ID,
+		"credit_transaction_id": creditRev.ID,
+		"original_debit_tx_id":  debitLeg.ID,
+		"original_credit_tx_id": creditLeg.ID,
+		"origin_account_id":     origOrigin.ID,
+		"dest_account_id":       origDest.ID,
+		"value":                 debitLeg.Value,
+		"currency":              debitLeg.Currency,
+		"transfer_group_id":     transferGroupID,
+		"status":                debitRev.Status,
+	}); err != nil {
 		return err
 	}
 

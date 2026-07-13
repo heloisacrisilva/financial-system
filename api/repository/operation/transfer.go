@@ -127,6 +127,18 @@ func TransferOperation(accountOrigID uint64, accountDestID uint64, currency stri
 		if err := tx.Save(&debitHistory).Error; err != nil {
 			return err
 		}
+		if err := enqueueOperationEvent(tx, "operation.transfer.success", refID, map[string]interface{}{
+			"debit_transaction_id":  debitHistory.ID,
+			"credit_transaction_id": creditHistory.ID,
+			"origin_account_id":     originAccount.ID,
+			"dest_account_id":       destAccount.ID,
+			"value":                 value,
+			"currency":              originAccount.Currency,
+			"transfer_group_id":     transferGroupID,
+			"status":                debitHistory.Status,
+		}); err != nil {
+			return err
+		}
 
 		return nil
 	})

@@ -68,6 +68,17 @@ func DebitOperation(accountID uint64, currency string, value int64, refID string
 			}
 			return err
 		}
+		if err := enqueueOperationEvent(tx, "operation.debit.success", refID, map[string]interface{}{
+			"transaction_id":    history.ID,
+			"account_id":        account.ID,
+			"value":             value,
+			"currency":          account.Currency,
+			"available_balance": account.AvailableBalance,
+			"reserved_balance":  account.ReservedBalance,
+			"status":            history.Status,
+		}); err != nil {
+			return err
+		}
 		return nil
 	})
 

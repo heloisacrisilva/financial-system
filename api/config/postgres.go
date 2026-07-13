@@ -52,6 +52,7 @@ func InitializeConnectDB(logger *Logger) (*gorm.DB, error) {
 	models := []interface{}{
 		&entities.Account{},
 		&entities.Client{},
+		&entities.OperationEvent{},
 		&entities.OperationReference{},
 		&entities.TransactionHistory{},
 	}
