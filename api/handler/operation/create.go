@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 type OperationRequest struct {
@@ -22,11 +23,12 @@ type OperationRequest struct {
 	OriginalReferenceID string `json:"original_reference_id"`
 	Value               int64  `json:"value"`
 	Currency            string `json:"currency"`
-	ReferenceID         string `json:"reference_id" binding:"required"`
+	ReferenceID         string `json:"-"`
 }
 
 type OperationResponse struct {
 	TransactionID    string    `json:"transaction_id"`
+	ReferenceID      string    `json:"reference_id"`
 	Status           string    `json:"status"`
 	Balance          int64     `json:"balance"`
 	ReservedBalance  int64     `json:"reserved_balance"`
@@ -40,6 +42,7 @@ type OperationResponse struct {
 
 type TransferOperationResponse struct {
 	TransactionID   string    `json:"transaction_id"`
+	ReferenceID     string    `json:"reference_id"`
 	Status          string    `json:"status"`
 	Type            string    `json:"type"`
 	OriginAccountID uint64    `json:"origin_account_id"`
@@ -64,6 +67,7 @@ type ReversalAccountResult struct {
 
 type ReversalOperationResponse struct {
 	TransactionID   string                  `json:"transaction_id"`
+	ReferenceID     string                  `json:"reference_id"`
 	Status          string                  `json:"status"`
 	Type            string                  `json:"type"`
 	Timestamp       time.Time               `json:"timestamp"`
@@ -187,6 +191,7 @@ func CreateOperation(ctx *gin.Context) {
 
 		resp := TransferOperationResponse{
 			TransactionID:   debit.ReferenceID + "-PROCESSED",
+			ReferenceID:     debit.ReferenceID,
 			Status:          debit.Status,
 			Type:            opType,
 			OriginAccountID: originAccount.ID,
@@ -224,6 +229,7 @@ func CreateOperation(ctx *gin.Context) {
 
 		resp := ReversalOperationResponse{
 			TransactionID:   first.ReferenceID + "-PROCESSED",
+			ReferenceID:     first.ReferenceID,
 			Status:          first.Status,
 			Type:            opType,
 			Timestamp:       first.CreatedAt,
@@ -244,6 +250,7 @@ func CreateOperation(ctx *gin.Context) {
 
 	resp := OperationResponse{
 		TransactionID:    history.ReferenceID + "-PROCESSED",
+		ReferenceID:      history.ReferenceID,
 		Status:           history.Status,
 		Balance:          account.AvailableBalance + account.ReservedBalance,
 		ReservedBalance:  account.ReservedBalance,
@@ -258,10 +265,7 @@ func CreateOperation(ctx *gin.Context) {
 }
 
 func (r *OperationRequest) OperationValidate(opType string) error {
-	r.ReferenceID = strings.TrimSpace(r.ReferenceID)
-	if r.ReferenceID == "" {
-		return handler.ErrParamIsRequired("reference_id", "string")
-	}
+	r.ReferenceID = uuid.NewString()
 
 	if opType == "reversal" {
 		r.OriginalReferenceID = strings.TrimSpace(r.OriginalReferenceID)

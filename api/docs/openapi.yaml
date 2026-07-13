@@ -110,7 +110,7 @@ paths:
       tags:
         - Operations
       summary: Processa uma operacao financeira
-      description: Processa credit, debit, reserve, capture, transfer ou reversal. O reference_id e idempotente para a operacao.
+      description: Processa credit, debit, reserve, capture, transfer ou reversal. A API gera o reference_id automaticamente e o devolve na resposta.
       operationId: createOperation
       parameters:
         - name: type
@@ -131,18 +131,15 @@ paths:
                   account_id: 1
                   value: 100000
                   currency: BRL
-                  reference_id: TXN-001
               transfer:
                 value:
                   account_id: 1
                   account_dest_id: 2
                   value: 50000
                   currency: BRL
-                  reference_id: TXN-002
               reversal:
                 value:
-                  original_reference_id: TXN-001
-                  reference_id: TXN-003
+                  original_reference_id: 2d266f9f-01f8-44b0-a5ed-7f5da1a18d0c
       responses:
         "200":
           description: Operacao processada com sucesso.
@@ -268,7 +265,6 @@ components:
           example: "12345678901"
     OperationRequest:
       type: object
-      required: [reference_id]
       properties:
         account_id:
           type: integer
@@ -291,9 +287,6 @@ components:
           minLength: 3
           maxLength: 3
           example: BRL
-        reference_id:
-          type: string
-          description: Identificador idempotente da operacao.
     SuccessEnvelope:
       type: object
       required: [message]
@@ -398,6 +391,9 @@ components:
       properties:
         transaction_id:
           type: string
+        reference_id:
+          type: string
+          description: Identificador gerado pela API para idempotencia e estorno.
         status:
           type: string
           enum: [success, failed, pending]
@@ -436,6 +432,9 @@ components:
       properties:
         transaction_id:
           type: string
+        reference_id:
+          type: string
+          description: Identificador gerado pela API para idempotencia e estorno.
         status:
           type: string
         type:
@@ -500,6 +499,9 @@ components:
       properties:
         transaction_id:
           type: string
+        reference_id:
+          type: string
+          description: Identificador gerado pela API para idempotencia.
         status:
           type: string
         type:
