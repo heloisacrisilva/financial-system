@@ -1,15 +1,15 @@
 # Financial System API
 
-API REST em Go para processamento de transacoes financeiras com contas, clientes, historico, idempotencia por `reference_id`, controle de concorrencia por lock pessimista e eventos assincronos via outbox.
+API REST em Go para processamento de transações financeiras com contas, clientes, histórico, `reference_id` gerado pela API, controle de concorrência por lock pessimista e eventos assíncronos via outbox.
 
 ## Stack
 
 - Go 1.25
 - Gin para HTTP
-- GORM para persistencia
+- GORM para persistência
 - PostgreSQL
 - Docker Compose para subir o banco local
-- OpenAPI/Swagger para documentacao da API
+- OpenAPI/Swagger para documentação da API
 
 ## Como Rodar
 
@@ -21,7 +21,7 @@ docker-compose up -d
 
 O banco sobe em `localhost:5435`.
 
-### 2. Configurar variaveis de ambiente
+### 2. Configurar variáveis de ambiente
 
 O projeto espera:
 
@@ -34,15 +34,15 @@ DB_HOST=localhost
 APP_PORT=8080
 ```
 
-O arquivo `.env` local ja contem a configuracao do banco. `APP_PORT` e opcional; se nao informado, a API usa `8080`.
+O arquivo `.env` local já contém a configuração do banco. `APP_PORT` é opcional; se não informado, a API usa `8080`.
 
-### 3. Executar a aplicacao
+### 3. Executar a aplicação
 
 ```bash
 go run main.go
 ```
 
-A API ficara disponivel em:
+A API ficará disponível em:
 
 ```text
 http://localhost:8080
@@ -54,16 +54,16 @@ http://localhost:8080
 go test ./...
 ```
 
-Neste momento o projeto compila todos os pacotes, mas ainda nao possui arquivos `*_test.go`. A proxima evolucao recomendada e adicionar testes unitarios para regras de operacao e testes de integracao com PostgreSQL.
+Neste momento o projeto compila todos os pacotes, mas ainda não possui arquivos `*_test.go`. A próxima evolução recomendada é adicionar testes unitários para regras de operação e testes de integração com PostgreSQL.
 
 ## Swagger / OpenAPI
 
-Com a aplicacao rodando:
+Com a aplicação rodando:
 
 - Swagger UI: http://localhost:8080/swagger
 - OpenAPI YAML: http://localhost:8080/openapi.yaml
 
-O contrato tambem esta versionado em:
+O contrato também está versionado em:
 
 ```text
 api/docs/openapi.yaml
@@ -90,7 +90,7 @@ GET  /api/accounts/{id}
 GET /api/clients/{id}
 ```
 
-### Operacoes
+### Operações
 
 ```http
 POST /api/operations/{type}
@@ -147,10 +147,11 @@ curl -X POST http://localhost:8080/api/operations/credit \
   -d '{
     "account_id": 1,
     "value": 100000,
-    "currency": "BRL",
-    "reference_id": "TXN-001"
+    "currency": "BRL"
   }'
 ```
+
+A resposta inclui `reference_id`, que pode ser usado depois como `original_reference_id` em um estorno.
 
 ### Debitar Saldo
 
@@ -160,8 +161,7 @@ curl -X POST http://localhost:8080/api/operations/debit \
   -d '{
     "account_id": 1,
     "value": 20000,
-    "currency": "BRL",
-    "reference_id": "TXN-002"
+    "currency": "BRL"
   }'
 ```
 
@@ -173,8 +173,7 @@ curl -X POST http://localhost:8080/api/operations/reserve \
   -d '{
     "account_id": 1,
     "value": 30000,
-    "currency": "BRL",
-    "reference_id": "TXN-003"
+    "currency": "BRL"
   }'
 ```
 
@@ -186,8 +185,7 @@ curl -X POST http://localhost:8080/api/operations/capture \
   -d '{
     "account_id": 1,
     "value": 30000,
-    "currency": "BRL",
-    "reference_id": "TXN-004"
+    "currency": "BRL"
   }'
 ```
 
@@ -200,82 +198,82 @@ curl -X POST http://localhost:8080/api/operations/transfer \
     "account_id": 1,
     "account_dest_id": 2,
     "value": 50000,
-    "currency": "BRL",
-    "reference_id": "TXN-005"
+    "currency": "BRL"
   }'
 ```
 
-### Estornar Operacao
+### Estornar Operação
 
 ```bash
 curl -X POST http://localhost:8080/api/operations/reversal \
   -H "Content-Type: application/json" \
   -d '{
-    "original_reference_id": "TXN-005",
-    "reference_id": "TXN-006"
+    "original_reference_id": "reference-id-retornado-na-operação-original"
   }'
 ```
 
-### Consultar Historico Por ID
+### Consultar Histórico Por ID
 
 ```bash
 curl http://localhost:8080/api/operations/1
 ```
 
-## Regras de Negocio Implementadas
+## Regras de Negócio Implementadas
 
-- Credito adiciona valor ao saldo disponivel.
-- Debito remove valor do saldo disponivel e considera limite de credito.
-- Reserva move valor do saldo disponivel para saldo reservado.
-- Captura confirma uma reserva conforme regra do projeto, retirando do reservado e refletindo no saldo disponivel.
-- Transferencia movimenta valor entre duas contas.
-- Estorno reverte creditos, debitos e transferencias.
+- Crédito adiciona valor ao saldo disponível.
+- Débito remove valor do saldo disponível e considera limite de crédito.
+- Reserva move valor do saldo disponível para saldo reservado.
+- Captura confirma uma reserva conforme regra do projeto, retirando do reservado e refletindo no saldo disponível.
+- Transferência movimenta valor entre duas contas.
+- Estorno reverte créditos, débitos e transferências.
 - Contas precisam estar ativas para operar.
-- Moeda da operacao deve bater com a moeda da conta quando informada.
-- `reference_id` e idempotente no nivel da operacao.
-- Operacoes financeiras sao atomicas com transacao de banco.
-- Operacoes na mesma conta usam lock pessimista (`SELECT FOR UPDATE`) para consistencia em concorrencia.
+- Moeda da operação deve bater com a moeda da conta quando informada.
+- A API gera um `reference_id` único para cada operação.
+- Operações financeiras são atômicas com transação de banco.
+- Operações na mesma conta usam lock pessimista (`SELECT FOR UPDATE`) para consistência em concorrência.
 
-## Idempotencia
+## Idempotência
 
-A idempotencia e controlada pela tabela `operation_references`, que possui `reference_id` unico.
+A idempotência é controlada pela tabela `operation_references`, que possui `reference_id` único. O valor é gerado pela API quando a operação é recebida e retornado no payload de sucesso.
 
-Esse controle fica separado de `transaction_histories` porque uma unica operacao pode gerar mais de uma linha de historico. Exemplo: uma transferencia gera uma perna de debito e outra de credito, ambas com o mesmo `reference_id`.
+Esse controle fica separado de `transaction_histories` porque uma única operação pode gerar mais de uma linha de histórico. Exemplo: uma transferência gera uma "perna" de débito e outra de crédito, ambas com o mesmo `reference_id`.
 
-## Eventos Assincronos
+Para estornar uma operação, use o `reference_id` retornado pela operação original no campo `original_reference_id`.
 
-O projeto usa o padrao outbox:
+## Eventos Assíncronos
 
-1. A operacao financeira grava saldo/historico dentro de uma transacao.
-2. Na mesma transacao, grava um registro em `operation_events` com status `pending`.
+O projeto usa o padrão outbox:
+
+1. A operação financeira grava saldo/histórico dentro de uma transação.
+2. Na mesma transação, grava um registro em `operation_events` com status `pending`.
 3. Um worker em background busca eventos pendentes.
 4. O worker publica o evento e marca como `published`.
 5. Se falhar, marca como `failed` e agenda retry com backoff exponencial.
 
-Hoje a publicacao real e simulada por log no metodo `publishEvent`. A estrutura esta preparada para substituir essa funcao por Kafka, RabbitMQ, SQS ou outro broker.
+Hoje a publicação real é simulada por log no método `publishEvent`. A estrutura está preparada para substituir essa função por Kafka, RabbitMQ, SQS ou outro broker.
 
-## Decisoes Tecnicas
+## Decisões Técnicas
 
 - **Gin**: framework HTTP simples e direto para APIs REST.
-- **GORM**: reduz boilerplate de persistencia e suporta transacoes, locks e migracao automatica.
-- **PostgreSQL**: banco relacional adequado para consistencia transacional e controle de concorrencia.
-- **Outbox pattern**: evita perder eventos quando a operacao de negocio foi persistida, mas a publicacao externa falha.
-- **Lock pessimista**: usado nas contas durante operacoes financeiras para evitar race condition de saldo.
+- **GORM**: reduz boilerplate de persistência e suporta transações, locks e migração automática.
+- **PostgreSQL**: banco relacional adequado para consistência transacional e controle de concorrência.
+- **Outbox pattern**: evita perder eventos quando a operação de negócio foi persistida, mas a publicação externa falha.
+- **Lock pessimista**: usado nas contas durante operações financeiras para evitar race condition de saldo.
 - **Retry com backoff**: aplicado tanto no handler para falhas retryable quanto no dispatcher de eventos.
 
 ## Estrutura do Projeto
 
 ```text
 api/
-  config/        Configuracao de banco e logger
+  config/        Configuração de banco e logger
   docs/          Contrato OpenAPI
   entities/      Modelos persistidos
   events/        Dispatcher em background dos eventos
   handler/       Handlers HTTP
-  helpers/       Funcoes auxiliares
-  repository/    Regras de persistencia e operacoes financeiras
+  helpers/       Funções auxiliares
+  repository/    Regras de persistência e operações financeiras
   router/        Rotas HTTP
-main.go          Bootstrap da aplicacao
+main.go          Bootstrap da aplicação
 docker-compose.yml
 ```
 
@@ -283,14 +281,14 @@ docker-compose.yml
 
 O projeto possui logs para:
 
-- inicializacao da aplicacao;
-- erros de validacao;
+- inicialização da aplicação;
+- erros de validação;
 - erros de banco;
-- falhas de operacoes;
-- publicacao de eventos;
+- falhas de operações;
+- publicação de eventos;
 - falhas e retries no dispatcher de eventos.
 - health check da API e conectividade com PostgreSQL.
 
-## Limitacoes Conhecidas
+## Limitações Conhecidas
 
-- Ainda nao ha testes unitarios e de integracao automatizados.
+- Ainda não há testes unitários e de integração automatizados.
