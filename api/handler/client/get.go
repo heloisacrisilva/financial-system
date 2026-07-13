@@ -11,6 +11,8 @@ import (
 	"gorm.io/gorm"
 )
 
+var getClientDbFunc = repository.GetClientRepository
+
 func GetClientByID(ctx *gin.Context) {
 	logger := config.GetLogger()
 
@@ -21,7 +23,9 @@ func GetClientByID(ctx *gin.Context) {
 		return
 	}
 
-	client, err := repository.GetClientRepository(clientID)
+	//TEST
+	client, err := getClientDbFunc(clientID)
+	// client, err := repository.GetClientRepository(clientID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			logger.Warnf("Client with ID %s not found.", clientID)
