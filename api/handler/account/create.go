@@ -17,6 +17,8 @@ type CreateAccountRequest struct {
 	CPF   string `json:"cpf" binding:"required"`
 }
 
+var createAccountDbFunc = repository.CreateAccountRepository
+
 func CreateAccountHandler(ctx *gin.Context) {
 	logger := config.GetLogger()
 
@@ -32,8 +34,9 @@ func CreateAccountHandler(ctx *gin.Context) {
 		handler.SendError(ctx, http.StatusBadRequest, err.Error())
 		return
 	}
-
-	account, err := repository.CreateAccountRepository(request.Name, request.Email, request.CPF)
+	//TEST:
+	account, err := createAccountDbFunc(request.Name, request.Email, request.CPF)
+	// account, err := repository.CreateAccountRepository(request.Name, request.Email, request.CPF)
 	if err != nil {
 		logger.Errorf("Error creating account: %v", err)
 
